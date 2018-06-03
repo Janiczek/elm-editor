@@ -1,6 +1,8 @@
-module Tests exposing (..)
+module CodeEditor exposing (..)
 
 import Test exposing (..)
+import Tests.GoToHoveredPosition as GoToHoveredPosition
+import Tests.Hover as Hover
 import Tests.InsertChar as InsertChar
 import Tests.Invariants as Invariants
 import Tests.MoveDown as MoveDown
@@ -15,7 +17,7 @@ import Tests.RemoveCharBefore as RemoveCharBefore
 
 suite : Test
 suite =
-    describe "Code Editor"
+    concat
         [ describe "Invariants"
             [ describe "position"
                 [ describe "line"
@@ -29,6 +31,9 @@ suite =
                 ]
             , describe "lines"
                 [ Invariants.linesArrayNeverEmpty
+                ]
+            , describe "hover"
+                [ Invariants.hoverAlwaysWithinBounds
                 ]
             ]
         , describe "Msgs"
@@ -87,6 +92,14 @@ suite =
                 , RemoveCharAfter.combinesLinesTogetherOnLastColumnOfNotLastLine
                 , RemoveCharAfter.decreasesCurrentLineLengthOnNotLastColumn
                 , RemoveCharAfter.removesTheCharOnNotLastColumn
+                ]
+            , describe "Hover"
+                [ Hover.setsHoverWithinBounds
+                ]
+            , describe "GoToHoveredPosition"
+                [ GoToHoveredPosition.doesNothingIfHoverIsNoHover
+                , GoToHoveredPosition.movesToLastColumnOfHoveredLineIfHoverIsHoverLine
+                , GoToHoveredPosition.movesToHoveredPositionIfHoverIsHoverChar
                 ]
             ]
         ]

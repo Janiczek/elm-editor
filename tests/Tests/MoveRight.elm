@@ -44,7 +44,7 @@ movesToStartOfNextLineIfOnTheLastColumnAndNotOnLastLine =
     <|
         \_ _ modelBeforeMsg _ finalModel ->
             Expect.all
-                [ \{ line } -> line |> Expect.equal (modelBeforeMsg.position.line + 1)
-                , \{ column } -> column |> Expect.equal 0
+                [ .line >> Expect.equal (modelBeforeMsg.position.line + 1)
+                , .column >> Expect.equal 0
                 ]
                 finalModel.position

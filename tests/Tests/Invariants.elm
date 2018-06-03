@@ -51,3 +51,28 @@ linesArrayNeverEmpty =
             finalModel.lines
                 |> Array.length
                 |> Expect.atLeast 1
+
+
+hoverAlwaysWithinBounds : Test
+hoverAlwaysWithinBounds =
+    invariantTest "hover always within bounds" app <|
+        \_ _ finalModel ->
+            case finalModel.hover of
+                NoHover ->
+                    Expect.pass
+
+                HoverLine line ->
+                    Expect.all
+                        [ Expect.atLeast 0
+                        , Expect.atMost (lastLine finalModel.lines)
+                        ]
+                        line
+
+                HoverChar position ->
+                    Expect.all
+                        [ .line >> Expect.atLeast 0
+                        , .line >> Expect.atMost (lastLine finalModel.lines)
+                        , .column >> Expect.atLeast 0
+                        , \{ line, column } -> column |> Expect.atMost (lastColumn finalModel.lines line)
+                        ]
+                        position

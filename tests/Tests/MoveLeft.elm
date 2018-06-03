@@ -41,13 +41,12 @@ movesToEndOfPreviousLineIfOnTheFirstColumnAndNotOnFirstLine =
     <|
         \_ _ modelBeforeMsg _ finalModel ->
             Expect.all
-                [ \{ line } -> line |> Expect.equal (modelBeforeMsg.position.line - 1)
-                , \{ column } ->
-                    column
-                        |> Expect.equal
-                            (lineLength
-                                modelBeforeMsg.lines
-                                (modelBeforeMsg.position.line - 1)
-                            )
+                [ .line >> Expect.equal (modelBeforeMsg.position.line - 1)
+                , .column
+                    >> Expect.equal
+                        (lineLength
+                            modelBeforeMsg.lines
+                            (modelBeforeMsg.position.line - 1)
+                        )
                 ]
                 finalModel.position

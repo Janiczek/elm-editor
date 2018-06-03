@@ -25,6 +25,8 @@ msgFuzzer =
         , insertChar
         , removeCharBefore
         , removeCharAfter
+        , hover
+        , goToHoveredPosition
         ]
 
 
@@ -71,3 +73,18 @@ removeCharBefore =
 removeCharAfter : Fuzzer Msg
 removeCharAfter =
     Fuzz.constant RemoveCharAfter
+
+
+hover : Fuzzer Msg
+hover =
+    Fuzz.oneOf
+        [ Fuzz.constant NoHover
+        , Fuzz.map HoverLine Fuzz.int
+        , Fuzz.map2 (\line column -> HoverChar { line = line, column = column }) Fuzz.int Fuzz.int
+        ]
+        |> Fuzz.map Hover
+
+
+goToHoveredPosition : Fuzzer Msg
+goToHoveredPosition =
+    Fuzz.constant GoToHoveredPosition

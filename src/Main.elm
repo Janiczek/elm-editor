@@ -2,7 +2,7 @@ module Main exposing (..)
 
 import Array.Hamt as Array exposing (Array)
 import Dom
-import Html as H exposing (Html)
+import Html as H exposing (Attribute, Html)
 import Html.Attributes as HA
 import Html.Events as HE
 import Json.Decode as JD exposing (Decoder)
@@ -22,7 +22,14 @@ main =
 type alias Model =
     { lines : Array String
     , position : Position
+    , hover : Hover
     }
+
+
+type Hover
+    = NoHover
+    | HoverLine Int
+    | HoverChar Position
 
 
 type alias Position =
@@ -41,12 +48,15 @@ type Msg
     | InsertChar Char
     | RemoveCharBefore
     | RemoveCharAfter
+    | Hover Hover
+    | GoToHoveredPosition
 
 
 initModel : Model
 initModel =
     { lines = Array.fromList [ "" ]
     , position = Position 0 0
+    , hover = NoHover
     }
 
 
@@ -130,6 +140,7 @@ update msg model =
 
         NewLine ->
             ( newLine model
+                |> sanitizeHover
             , Cmd.none
             )
 
@@ -140,17 +151,69 @@ update msg model =
 
         RemoveCharBefore ->
             ( removeCharBefore model
+                |> sanitizeHover
             , Cmd.none
             )
 
         RemoveCharAfter ->
             ( removeCharAfter model
+                |> sanitizeHover
+            , Cmd.none
+            )
+
+        Hover hover ->
+            ( { model | hover = hover }
+                |> sanitizeHover
+            , Cmd.none
+            )
+
+        GoToHoveredPosition ->
+            ( { model
+                | position =
+                    case model.hover of
+                        NoHover ->
+                            model.position
+
+                        HoverLine line ->
+                            { line = line
+                            , column = lastColumn model.lines line
+                            }
+
+                        HoverChar position ->
+                            position
+              }
             , Cmd.none
             )
 
 
+sanitizeHover : Model -> Model
+sanitizeHover model =
+    { model
+        | hover =
+            case model.hover of
+                NoHover ->
+                    model.hover
+
+                HoverLine line ->
+                    HoverLine (clamp 0 (lastLine model.lines) line)
+
+                HoverChar { line, column } ->
+                    let
+                        sanitizedLine =
+                            clamp 0 (lastLine model.lines) line
+
+                        sanitizedColumn =
+                            clamp 0 (lastColumn model.lines sanitizedLine) column
+                    in
+                    HoverChar
+                        { line = sanitizedLine
+                        , column = sanitizedColumn
+                        }
+    }
+
+
 newLine : Model -> Model
-newLine { position, lines } =
+newLine ({ position, lines } as model) =
     let
         { line, column } =
             position
@@ -197,13 +260,14 @@ newLine { position, lines } =
             , column = 0
             }
     in
-    { lines = newLines
-    , position = newPosition
+    { model
+        | lines = newLines
+        , position = newPosition
     }
 
 
 insertChar : Char -> Model -> Model
-insertChar char { position, lines } =
+insertChar char ({ position, lines } as model) =
     let
         { line, column } =
             position
@@ -231,8 +295,9 @@ insertChar char { position, lines } =
             , column = column + 1
             }
     in
-    { lines = newLines
-    , position = newPosition
+    { model
+        | lines = newLines
+        , position = newPosition
     }
 
 
@@ -274,8 +339,9 @@ removeCharBefore ({ position, lines } as model) =
                     |> List.concatMap removeCharFromLine
                     |> Array.fromList
         in
-        { lines = newLines
-        , position = moveLeft position lines
+        { model
+            | lines = newLines
+            , position = moveLeft position lines
         }
 
 
@@ -316,8 +382,9 @@ removeCharAfter ({ position, lines } as model) =
                     |> List.concatMap removeCharFromLine
                     |> Array.fromList
         in
-        { lines = newLines
-        , position = position
+        { model
+            | lines = newLines
+            , position = position
         }
 
 
@@ -485,7 +552,7 @@ view model =
 
 
 viewDebug : Model -> Html Msg
-viewDebug { lines, position } =
+viewDebug { lines, position, hover } =
     H.div
         [ HA.style [ ( "max-width", "100%" ) ] ]
         [ H.text "lines:"
@@ -494,6 +561,8 @@ viewDebug { lines, position } =
             [ H.text (toString lines) ]
         , H.text "position:"
         , H.pre [] [ H.text (toString position) ]
+        , H.text "hover:"
+        , H.pre [] [ H.text (toString hover) ]
         ]
 
 
@@ -545,42 +614,65 @@ viewContent model =
             [ ( "position", "relative" )
             , ( "flex", "1" )
             , ( "background-color", "#f0f0f0" )
+            , ( "user-select", "none" )
             ]
+        , HE.onClick GoToHoveredPosition
+        , HE.onMouseOut (Hover NoHover)
         ]
-        [ viewLines model.position model.lines ]
+        [ viewLines model.position model.hover model.lines ]
 
 
-viewLines : Position -> Array String -> Html Msg
-viewLines position lines =
+viewLines : Position -> Hover -> Array String -> Html Msg
+viewLines position hover lines =
     H.div []
         (lines
-            |> Array.indexedMap (viewLine position lines)
+            |> Array.indexedMap (viewLine position hover lines)
             |> Array.toList
         )
 
 
-viewLine : Position -> Array String -> Int -> String -> Html Msg
-viewLine position lines lineNum line =
+viewLine : Position -> Hover -> Array String -> Int -> String -> Html Msg
+viewLine position hover lines line content =
     H.div
         [ HA.style
             [ ( "position", "absolute" )
             , ( "left", "0" )
-            , ( "top", toString (toFloat lineNum * lineHeight) ++ "px" )
+            , ( "right", "0" )
+            , ( "height", toString lineHeight ++ "px" )
+            , ( "top", toString (toFloat line * lineHeight) ++ "px" )
             ]
+        , HE.onMouseOver (Hover (HoverLine line))
         ]
-        (if position.line == lineNum then
-            if isLastColumn lines lineNum position.column then
-                [ H.text line
-                , viewCursor nbsp
-                ]
-            else
-                [ H.text (String.left position.column line)
-                , viewCursor (String.left 1 (String.dropLeft position.column line))
-                , H.text (String.dropLeft (position.column + 1) line)
-                ]
+        (if position.line == line && isLastColumn lines line position.column then
+            viewChars position hover lines line content
+                ++ [ viewCursor position positionColor nbsp ]
          else
-            [ H.text line ]
+            viewChars position hover lines line content
         )
+
+
+viewChars : Position -> Hover -> Array String -> Int -> String -> List (Html Msg)
+viewChars position hover lines line content =
+    content
+        |> String.toList
+        |> List.indexedMap (viewChar position hover lines line)
+
+
+viewChar : Position -> Hover -> Array String -> Int -> Int -> Char -> Html Msg
+viewChar position hover lines line column char =
+    if position.line == line && position.column == column then
+        viewCursor position positionColor (String.fromChar char)
+    else
+        let
+            charPosition =
+                { line = line, column = column }
+        in
+        if hover == HoverChar charPosition then
+            viewCursor charPosition hoverColor (String.fromChar char)
+        else
+            H.span
+                [ onHover { line = line, column = column } ]
+                [ H.text (String.fromChar char) ]
 
 
 nbsp : String
@@ -588,11 +680,30 @@ nbsp =
     " "
 
 
-viewCursor : String -> Html Msg
-viewCursor char =
+positionColor : String
+positionColor =
+    "orange"
+
+
+hoverColor : String
+hoverColor =
+    "lightgrey"
+
+
+viewCursor : Position -> String -> String -> Html Msg
+viewCursor position color char =
     H.span
-        [ HA.style [ ( "background-color", "orange" ) ] ]
+        [ HA.style [ ( "background-color", color ) ]
+        , onHover position
+        ]
         [ H.text char ]
+
+
+onHover : Position -> Attribute Msg
+onHover position =
+    HE.onWithOptions "mouseover"
+        { stopPropagation = True, preventDefault = True }
+        (JD.succeed (Hover (HoverChar position)))
 
 
 fontSize : Float
