@@ -13,10 +13,10 @@ jumpsToEndOfLineIfOnLastLine =
     msgTestWithPrecondition "MoveDown jumps to end of line if on last line"
         app
         moveDown
-        (\model -> model.position.line == lastLine model.lines)
+        (\model -> model.cursor.line == lastLine model.lines)
     <|
         \_ _ _ _ finalModel ->
-            finalModel.position
+            finalModel.cursor
                 |> Expect.equal (endOfDocument finalModel.lines)
 
 
@@ -25,11 +25,11 @@ movesDownALineIfNotOnLastLine =
     msgTestWithPrecondition "MoveDown moves down a line if not on last line"
         app
         moveDown
-        (\model -> model.position.line /= lastLine model.lines)
+        (\model -> model.cursor.line /= lastLine model.lines)
     <|
         \_ _ modelBeforeMsg _ finalModel ->
-            finalModel.position.line
-                |> Expect.equal (modelBeforeMsg.position.line + 1)
+            finalModel.cursor.line
+                |> Expect.equal (modelBeforeMsg.cursor.line + 1)
 
 
 staysOnSameColumnIfNotOnLastLineAndEnoughCharsBelowCursor : Test
@@ -38,13 +38,13 @@ staysOnSameColumnIfNotOnLastLineAndEnoughCharsBelowCursor =
         app
         moveDown
         (\model ->
-            (model.position.line /= lastLine model.lines)
-                && (lineLength model.lines (model.position.line + 1) >= model.position.column)
+            (model.cursor.line /= lastLine model.lines)
+                && (lineLength model.lines (model.cursor.line + 1) >= model.cursor.column)
         )
     <|
         \_ _ modelBeforeMsg _ finalModel ->
-            finalModel.position.column
-                |> Expect.equal modelBeforeMsg.position.column
+            finalModel.cursor.column
+                |> Expect.equal modelBeforeMsg.cursor.column
 
 
 movesToLastColumnIfNotOnLastLineAndNoCharBelowCursor : Test
@@ -53,14 +53,14 @@ movesToLastColumnIfNotOnLastLineAndNoCharBelowCursor =
         app
         moveDown
         (\model ->
-            (model.position.line /= lastLine model.lines)
-                && (lineLength model.lines (model.position.line + 1) < model.position.column)
+            (model.cursor.line /= lastLine model.lines)
+                && (lineLength model.lines (model.cursor.line + 1) < model.cursor.column)
         )
     <|
         \_ _ _ _ finalModel ->
-            finalModel.position.column
+            finalModel.cursor.column
                 |> Expect.equal
                     (lastColumn
                         finalModel.lines
-                        finalModel.position.line
+                        finalModel.cursor.line
                     )

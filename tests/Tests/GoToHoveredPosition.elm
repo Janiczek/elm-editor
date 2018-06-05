@@ -42,7 +42,7 @@ movesToLastColumnOfHoveredLineIfHoverIsHoverLine =
                     Expect.fail "hover should have been HoverLine"
 
                 HoverLine line ->
-                    finalModel.position
+                    finalModel.cursor
                         |> Expect.equal
                             { line = line
                             , column = lastColumn modelBeforeMsg.lines line
@@ -78,7 +78,7 @@ movesToHoveredPositionIfHoverIsHoverChar =
                     Expect.fail "hover should have been HoverChar"
 
                 HoverChar { line, column } ->
-                    finalModel.position
+                    finalModel.cursor
                         |> Expect.equal
                             { line = line
                             , column = column

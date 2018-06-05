@@ -13,7 +13,7 @@ doesNothingOnStartOfDocument =
     msgTestWithPrecondition "MoveLeft does nothing on start of document"
         app
         moveLeft
-        (\model -> isStartOfDocument model.position)
+        (\model -> isStartOfDocument model.cursor)
     <|
         \_ _ modelBeforeMsg _ finalModel ->
             finalModel
@@ -25,11 +25,11 @@ movesLeftIfNotOnFirstColumn =
     msgTestWithPrecondition "MoveLeft moves left if not on first column"
         app
         moveLeft
-        (\model -> model.position.column /= 0)
+        (\model -> model.cursor.column /= 0)
     <|
         \_ _ modelBeforeMsg _ finalModel ->
-            finalModel.position.column
-                |> Expect.equal (modelBeforeMsg.position.column - 1)
+            finalModel.cursor.column
+                |> Expect.equal (modelBeforeMsg.cursor.column - 1)
 
 
 movesToEndOfPreviousLineIfOnTheFirstColumnAndNotOnFirstLine : Test
@@ -37,16 +37,16 @@ movesToEndOfPreviousLineIfOnTheFirstColumnAndNotOnFirstLine =
     msgTestWithPrecondition "MoveLeft moves to end of previous line if on the first column and not on first line"
         app
         moveLeft
-        (\model -> model.position.column == 0 && model.position.line /= 0)
+        (\model -> model.cursor.column == 0 && model.cursor.line /= 0)
     <|
         \_ _ modelBeforeMsg _ finalModel ->
             Expect.all
-                [ .line >> Expect.equal (modelBeforeMsg.position.line - 1)
+                [ .line >> Expect.equal (modelBeforeMsg.cursor.line - 1)
                 , .column
                     >> Expect.equal
                         (lineLength
                             modelBeforeMsg.lines
-                            (modelBeforeMsg.position.line - 1)
+                            (modelBeforeMsg.cursor.line - 1)
                         )
                 ]
-                finalModel.position
+                finalModel.cursor

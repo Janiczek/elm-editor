@@ -13,7 +13,7 @@ doesNothingOnEndOfDocument =
     msgTestWithPrecondition "MoveRight does nothing on end of document"
         app
         moveRight
-        (\model -> isEndOfDocument model.lines model.position)
+        (\model -> isEndOfDocument model.lines model.cursor)
     <|
         \_ _ modelBeforeMsg _ finalModel ->
             finalModel
@@ -25,11 +25,11 @@ movesRightIfNotOnLastColumn =
     msgTestWithPrecondition "MoveRight moves right if not on last column"
         app
         moveRight
-        (\model -> model.position.column /= lastColumn model.lines model.position.line)
+        (\model -> model.cursor.column /= lastColumn model.lines model.cursor.line)
     <|
         \_ _ modelBeforeMsg _ finalModel ->
-            finalModel.position.column
-                |> Expect.equal (modelBeforeMsg.position.column + 1)
+            finalModel.cursor.column
+                |> Expect.equal (modelBeforeMsg.cursor.column + 1)
 
 
 movesToStartOfNextLineIfOnTheLastColumnAndNotOnLastLine : Test
@@ -38,13 +38,13 @@ movesToStartOfNextLineIfOnTheLastColumnAndNotOnLastLine =
         app
         moveRight
         (\model ->
-            (model.position.column == lastColumn model.lines model.position.line)
-                && (model.position.line /= lastLine model.lines)
+            (model.cursor.column == lastColumn model.lines model.cursor.line)
+                && (model.cursor.line /= lastLine model.lines)
         )
     <|
         \_ _ modelBeforeMsg _ finalModel ->
             Expect.all
-                [ .line >> Expect.equal (modelBeforeMsg.position.line + 1)
+                [ .line >> Expect.equal (modelBeforeMsg.cursor.line + 1)
                 , .column >> Expect.equal 0
                 ]
-                finalModel.position
+                finalModel.cursor

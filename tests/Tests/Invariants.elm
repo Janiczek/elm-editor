@@ -8,39 +8,39 @@ import Test exposing (..)
 import Tests.Common exposing (..)
 
 
-positionLineIsAlwaysPositive : Test
-positionLineIsAlwaysPositive =
-    invariantTest "position.line is always positive" app <|
+cursorLineIsAlwaysPositive : Test
+cursorLineIsAlwaysPositive =
+    invariantTest "cursor.line is always positive" app <|
         \_ _ finalModel ->
-            finalModel.position.line
+            finalModel.cursor.line
                 |> Expect.atLeast 0
 
 
-positionLineNeverGetsToNonexistingLine : Test
-positionLineNeverGetsToNonexistingLine =
-    invariantTest "position.line never gets to nonexisting line" app <|
+cursorLineNeverGetsToNonexistingLine : Test
+cursorLineNeverGetsToNonexistingLine =
+    invariantTest "cursor.line never gets to nonexisting line" app <|
         \_ _ finalModel ->
-            finalModel.position.line
+            finalModel.cursor.line
                 |> Expect.atMost (lastLine finalModel.lines)
 
 
-positionColumnIsAlwaysPositive : Test
-positionColumnIsAlwaysPositive =
-    invariantTest "position.column is always positive" app <|
+cursorColumnIsAlwaysPositive : Test
+cursorColumnIsAlwaysPositive =
+    invariantTest "cursor.column is always positive" app <|
         \_ _ finalModel ->
-            finalModel.position.column
+            finalModel.cursor.column
                 |> Expect.atLeast 0
 
 
-positionColumnNeverGetsMoreThanOneCharAfterLineContents : Test
-positionColumnNeverGetsMoreThanOneCharAfterLineContents =
-    invariantTest "position.column never gets more than one char after line contents" app <|
+cursorColumnNeverGetsMoreThanOneCharAfterLineContents : Test
+cursorColumnNeverGetsMoreThanOneCharAfterLineContents =
+    invariantTest "cursor.column never gets more than one char after line contents" app <|
         \_ _ finalModel ->
-            finalModel.position.column
+            finalModel.cursor.column
                 |> Expect.atMost
                     (lastColumn
                         finalModel.lines
-                        finalModel.position.line
+                        finalModel.cursor.line
                     )
 
 

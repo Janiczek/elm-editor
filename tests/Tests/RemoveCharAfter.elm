@@ -13,7 +13,7 @@ doesNothingOnEndOfDocument =
     msgTestWithPrecondition "RemoveCharAfter does nothing on start of document"
         app
         removeCharAfter
-        (\model -> isEndOfDocument model.lines model.position)
+        (\model -> isEndOfDocument model.lines model.cursor)
     <|
         \_ _ modelBeforeMsg _ finalModel ->
             finalModel
@@ -27,8 +27,8 @@ doesntMove =
         removeCharAfter
     <|
         \_ _ modelBeforeMsg _ finalModel ->
-            finalModel.position
-                |> Expect.equal modelBeforeMsg.position
+            finalModel.cursor
+                |> Expect.equal modelBeforeMsg.cursor
 
 
 decreasesLineCountOnLastColumnOfNotLastLine : Test
@@ -37,8 +37,8 @@ decreasesLineCountOnLastColumnOfNotLastLine =
         app
         removeCharAfter
         (\model ->
-            isLastColumn model.lines model.position.line model.position.column
-                && not (isLastLine model.lines model.position.line)
+            isLastColumn model.lines model.cursor.line model.cursor.column
+                && not (isLastLine model.lines model.cursor.line)
         )
     <|
         \_ _ modelBeforeMsg _ finalModel ->
@@ -52,23 +52,23 @@ combinesLinesTogetherOnLastColumnOfNotLastLine =
         app
         removeCharAfter
         (\model ->
-            isLastColumn model.lines model.position.line model.position.column
-                && not (isLastLine model.lines model.position.line)
+            isLastColumn model.lines model.cursor.line model.cursor.column
+                && not (isLastLine model.lines model.cursor.line)
         )
     <|
         \_ _ modelBeforeMsg _ finalModel ->
             let
                 oldLine1 =
-                    lineContent modelBeforeMsg.lines modelBeforeMsg.position.line
+                    lineContent modelBeforeMsg.lines modelBeforeMsg.cursor.line
 
                 oldLine2 =
-                    lineContent modelBeforeMsg.lines (modelBeforeMsg.position.line + 1)
+                    lineContent modelBeforeMsg.lines (modelBeforeMsg.cursor.line + 1)
 
                 expectedNewLine =
                     oldLine1 ++ oldLine2
 
                 newLine =
-                    lineContent finalModel.lines finalModel.position.line
+                    lineContent finalModel.lines finalModel.cursor.line
             in
             newLine
                 |> Expect.equal expectedNewLine
@@ -79,15 +79,15 @@ decreasesCurrentLineLengthOnNotLastColumn =
     msgTestWithPrecondition "RemoveCharAfter decreases current line length on not last column"
         app
         removeCharAfter
-        (\model -> not (isLastColumn model.lines model.position.line model.position.column))
+        (\model -> not (isLastColumn model.lines model.cursor.line model.cursor.column))
     <|
         \_ _ modelBeforeMsg _ finalModel ->
             let
                 newLineLength =
-                    lineLength finalModel.lines finalModel.position.line
+                    lineLength finalModel.lines finalModel.cursor.line
 
                 oldLineLength =
-                    lineLength modelBeforeMsg.lines modelBeforeMsg.position.line
+                    lineLength modelBeforeMsg.lines modelBeforeMsg.cursor.line
             in
             newLineLength
                 |> Expect.equal (oldLineLength - 1)
@@ -98,26 +98,26 @@ removesTheCharOnNotLastColumn =
     msgTestWithPrecondition "RemoveCharAfter removes the char on not last column"
         app
         removeCharAfter
-        (\model -> not (isLastColumn model.lines model.position.line model.position.column))
+        (\model -> not (isLastColumn model.lines model.cursor.line model.cursor.column))
     <|
         \_ _ modelBeforeMsg _ finalModel ->
             let
                 oldLine =
-                    lineContent modelBeforeMsg.lines modelBeforeMsg.position.line
+                    lineContent modelBeforeMsg.lines modelBeforeMsg.cursor.line
 
                 oldLineBefore =
                     oldLine
-                        |> String.left modelBeforeMsg.position.column
+                        |> String.left modelBeforeMsg.cursor.column
 
                 oldLineAfter =
                     oldLine
-                        |> String.dropLeft (modelBeforeMsg.position.column + 1)
+                        |> String.dropLeft (modelBeforeMsg.cursor.column + 1)
 
                 expectedNewLine =
                     oldLineBefore ++ oldLineAfter
 
                 newLine =
-                    lineContent finalModel.lines finalModel.position.line
+                    lineContent finalModel.lines finalModel.cursor.line
             in
             newLine
                 |> Expect.equal expectedNewLine

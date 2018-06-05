@@ -15,8 +15,8 @@ movesRight =
         insertChar
     <|
         \_ _ modelBeforeMsg _ finalModel ->
-            finalModel.position.column
-                |> Expect.equal (modelBeforeMsg.position.column + 1)
+            finalModel.cursor.column
+                |> Expect.equal (modelBeforeMsg.cursor.column + 1)
 
 
 doesntMoveUpOrDown : Test
@@ -26,8 +26,8 @@ doesntMoveUpOrDown =
         insertChar
     <|
         \_ _ modelBeforeMsg _ finalModel ->
-            finalModel.position.line
-                |> Expect.equal modelBeforeMsg.position.line
+            finalModel.cursor.line
+                |> Expect.equal modelBeforeMsg.cursor.line
 
 
 makesLineLonger : Test
@@ -37,8 +37,8 @@ makesLineLonger =
         insertChar
     <|
         \_ _ modelBeforeMsg _ finalModel ->
-            lineLength finalModel.lines finalModel.position.line
-                |> Expect.equal (lineLength modelBeforeMsg.lines modelBeforeMsg.position.line + 1)
+            lineLength finalModel.lines finalModel.cursor.line
+                |> Expect.equal (lineLength modelBeforeMsg.lines modelBeforeMsg.cursor.line + 1)
 
 
 insertsChar : Test
@@ -55,16 +55,16 @@ insertsChar =
                             String.fromChar char
 
                         newLine =
-                            lineContent finalModel.lines finalModel.position.line
+                            lineContent finalModel.lines finalModel.cursor.line
 
                         oldLine =
-                            lineContent modelBeforeMsg.lines modelBeforeMsg.position.line
+                            lineContent modelBeforeMsg.lines modelBeforeMsg.cursor.line
 
                         beforeCursor =
-                            String.left modelBeforeMsg.position.column oldLine
+                            String.left modelBeforeMsg.cursor.column oldLine
 
                         afterCursor =
-                            String.dropLeft modelBeforeMsg.position.column oldLine
+                            String.dropLeft modelBeforeMsg.cursor.column oldLine
                     in
                     newLine
                         |> Expect.equal (beforeCursor ++ charString ++ afterCursor)

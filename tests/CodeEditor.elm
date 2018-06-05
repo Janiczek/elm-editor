@@ -19,14 +19,14 @@ suite : Test
 suite =
     concat
         [ describe "Invariants"
-            [ describe "position"
+            [ describe "cursor"
                 [ describe "line"
-                    [ Invariants.positionLineIsAlwaysPositive
-                    , Invariants.positionLineNeverGetsToNonexistingLine
+                    [ Invariants.cursorLineIsAlwaysPositive
+                    , Invariants.cursorLineNeverGetsToNonexistingLine
                     ]
                 , describe "column"
-                    [ Invariants.positionColumnIsAlwaysPositive
-                    , Invariants.positionColumnNeverGetsMoreThanOneCharAfterLineContents
+                    [ Invariants.cursorColumnIsAlwaysPositive
+                    , Invariants.cursorColumnNeverGetsMoreThanOneCharAfterLineContents
                     ]
                 ]
             , describe "lines"
@@ -35,6 +35,7 @@ suite =
             , describe "hover"
                 [ Invariants.hoverAlwaysWithinBounds
                 ]
+            , todo "selection"
             ]
         , describe "Msgs"
             [ describe "NoOp"
@@ -101,5 +102,7 @@ suite =
                 , GoToHoveredPosition.movesToLastColumnOfHoveredLineIfHoverIsHoverLine
                 , GoToHoveredPosition.movesToHoveredPositionIfHoverIsHoverChar
                 ]
+            , todo "StartSelecting"
+            , todo "StopSelecting"
             ]
         ]

@@ -4,6 +4,5 @@ Code editor written in Elm
 
 ### TODO
 
-- [ ] add selection by mouse
 - [ ] add context menu functionality
 - [ ] add copy paste

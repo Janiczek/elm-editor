@@ -21,8 +21,9 @@ main =
 
 type alias Model =
     { lines : Array String
-    , position : Position
+    , cursor : Position
     , hover : Hover
+    , selection : Selection
     }
 
 
@@ -30,6 +31,13 @@ type Hover
     = NoHover
     | HoverLine Int
     | HoverChar Position
+
+
+type Selection
+    = NoSelection
+    | SelectingFrom Hover
+    | SelectedChar Position
+    | Selection Position Position
 
 
 type alias Position =
@@ -50,13 +58,16 @@ type Msg
     | RemoveCharAfter
     | Hover Hover
     | GoToHoveredPosition
+    | StartSelecting
+    | StopSelecting
 
 
 initModel : Model
 initModel =
     { lines = Array.fromList [ "" ]
-    , position = Position 0 0
+    , cursor = Position 0 0
     , hover = NoHover
+    , selection = NoSelection
     }
 
 
@@ -119,22 +130,22 @@ update msg model =
             ( model, Cmd.none )
 
         MoveUp ->
-            ( { model | position = moveUp model.position model.lines }
+            ( { model | cursor = moveUp model.cursor model.lines }
             , Cmd.none
             )
 
         MoveDown ->
-            ( { model | position = moveDown model.position model.lines }
+            ( { model | cursor = moveDown model.cursor model.lines }
             , Cmd.none
             )
 
         MoveLeft ->
-            ( { model | position = moveLeft model.position model.lines }
+            ( { model | cursor = moveLeft model.cursor model.lines }
             , Cmd.none
             )
 
         MoveRight ->
-            ( { model | position = moveRight model.position model.lines }
+            ( { model | cursor = moveRight model.cursor model.lines }
             , Cmd.none
             )
 
@@ -169,10 +180,10 @@ update msg model =
 
         GoToHoveredPosition ->
             ( { model
-                | position =
+                | cursor =
                     case model.hover of
                         NoHover ->
-                            model.position
+                            model.cursor
 
                         HoverLine line ->
                             { line = line
@@ -184,6 +195,109 @@ update msg model =
               }
             , Cmd.none
             )
+
+        StartSelecting ->
+            ( { model | selection = SelectingFrom model.hover }
+            , Cmd.none
+            )
+
+        StopSelecting ->
+            -- Selection for all other
+            let
+                endHover =
+                    model.hover
+
+                newSelection =
+                    case model.selection of
+                        NoSelection ->
+                            NoSelection
+
+                        SelectingFrom startHover ->
+                            if startHover == endHover then
+                                case startHover of
+                                    NoHover ->
+                                        NoSelection
+
+                                    HoverLine _ ->
+                                        NoSelection
+
+                                    HoverChar position ->
+                                        SelectedChar position
+                            else
+                                hoversToPositions model.lines startHover endHover
+                                    |> Maybe.map (\( from, to ) -> Selection from to)
+                                    |> Maybe.withDefault NoSelection
+
+                        SelectedChar _ ->
+                            NoSelection
+
+                        Selection _ _ ->
+                            NoSelection
+            in
+            ( { model | selection = newSelection }
+            , Cmd.none
+            )
+
+
+hoversToPositions : Array String -> Hover -> Hover -> Maybe ( Position, Position )
+hoversToPositions lines from to =
+    let
+        selectionLinePosition : Int -> Position -> ( Position, Position )
+        selectionLinePosition line position =
+            if line >= position.line then
+                ( position
+                , { line = line, column = lastColumn lines line }
+                )
+            else
+                ( { line = line + 1, column = 0 }
+                , position
+                )
+    in
+    case ( from, to ) of
+        ( NoHover, _ ) ->
+            Nothing
+
+        ( _, NoHover ) ->
+            Nothing
+
+        ( HoverLine line1, HoverLine line2 ) ->
+            let
+                smaller =
+                    min line1 line2
+
+                bigger =
+                    max line1 line2
+            in
+            Just
+                ( { line = smaller + 1, column = 0 }
+                , { line = bigger, column = lastColumn lines bigger }
+                )
+
+        ( HoverLine line, HoverChar position ) ->
+            Just (selectionLinePosition line position)
+
+        ( HoverChar position, HoverLine line ) ->
+            Just (selectionLinePosition line position)
+
+        ( HoverChar position1, HoverChar position2 ) ->
+            let
+                ( smaller, bigger ) =
+                    if comparePositions position1 position2 == LT then
+                        ( position1, position2 )
+                    else
+                        ( position2, position1 )
+            in
+            Just ( smaller, bigger )
+
+
+comparePositions : Position -> Position -> Order
+comparePositions from to =
+    if from.line < to.line || (from.line == to.line && from.column < to.column) then
+        LT
+    else if from == to then
+        EQ
+    else
+        GT
 
 
 sanitizeHover : Model -> Model
@@ -213,10 +327,10 @@ sanitizeHover model =
 
 
 newLine : Model -> Model
-newLine ({ position, lines } as model) =
+newLine ({ cursor, lines } as model) =
     let
         { line, column } =
-            position
+            cursor
 
         linesList : List String
         linesList =
@@ -254,23 +368,23 @@ newLine ({ position, lines } as model) =
             )
                 |> Array.fromList
 
-        newPosition : Position
-        newPosition =
+        newCursor : Position
+        newCursor =
             { line = line_
             , column = 0
             }
     in
     { model
         | lines = newLines
-        , position = newPosition
+        , cursor = newCursor
     }
 
 
 insertChar : Char -> Model -> Model
-insertChar char ({ position, lines } as model) =
+insertChar char ({ cursor, lines } as model) =
     let
         { line, column } =
-            position
+            cursor
 
         lineWithCharAdded : String -> String
         lineWithCharAdded content =
@@ -289,26 +403,26 @@ insertChar char ({ position, lines } as model) =
                             content
                     )
 
-        newPosition : Position
-        newPosition =
+        newCursor : Position
+        newCursor =
             { line = line
             , column = column + 1
             }
     in
     { model
         | lines = newLines
-        , position = newPosition
+        , cursor = newCursor
     }
 
 
 removeCharBefore : Model -> Model
-removeCharBefore ({ position, lines } as model) =
-    if isStartOfDocument position then
+removeCharBefore ({ cursor, lines } as model) =
+    if isStartOfDocument cursor then
         model
     else
         let
             { line, column } =
-                position
+                cursor
 
             lineIsEmpty : Bool
             lineIsEmpty =
@@ -341,18 +455,18 @@ removeCharBefore ({ position, lines } as model) =
         in
         { model
             | lines = newLines
-            , position = moveLeft position lines
+            , cursor = moveLeft cursor lines
         }
 
 
 removeCharAfter : Model -> Model
-removeCharAfter ({ position, lines } as model) =
-    if isEndOfDocument lines position then
+removeCharAfter ({ cursor, lines } as model) =
+    if isEndOfDocument lines cursor then
         model
     else
         let
             { line, column } =
-                position
+                cursor
 
             isOnLastColumn : Bool
             isOnLastColumn =
@@ -384,7 +498,7 @@ removeCharAfter ({ position, lines } as model) =
         in
         { model
             | lines = newLines
-            , position = position
+            , cursor = cursor
         }
 
 
@@ -552,18 +666,68 @@ view model =
 
 
 viewDebug : Model -> Html Msg
-viewDebug { lines, position, hover } =
+viewDebug { lines, cursor, hover, selection } =
     H.div
         [ HA.style [ ( "max-width", "100%" ) ] ]
         [ H.text "lines:"
         , H.pre
             [ HA.style [ ( "white-space", "pre-wrap" ) ] ]
             [ H.text (toString lines) ]
-        , H.text "position:"
-        , H.pre [] [ H.text (toString position) ]
+        , H.text "cursor:"
+        , H.pre [] [ H.text (toString cursor) ]
         , H.text "hover:"
         , H.pre [] [ H.text (toString hover) ]
+        , H.text "selection:"
+        , H.pre [] [ H.text (toString selection) ]
+        , H.text "selected text:"
+        , H.pre [] [ H.text (selectedText selection hover lines) ]
         ]
+
+
+selectedText : Selection -> Hover -> Array String -> String
+selectedText selection currentHover lines =
+    let
+        positionsToString : Position -> Position -> String
+        positionsToString from to =
+            let
+                numberOfLines =
+                    to.line - from.line + 1
+            in
+            lines
+                |> Array.toList
+                |> List.drop from.line
+                |> List.take numberOfLines
+                |> List.indexedMap
+                    (\i line ->
+                        if numberOfLines == 1 then
+                            line
+                                |> String.dropLeft from.column
+                                |> String.left (to.column - from.column + 1)
+                        else if i == 0 then
+                            String.dropLeft from.column line
+                        else if i == numberOfLines - 1 then
+                            String.left (to.column + 1) line
+                        else
+                            line
+                    )
+                |> String.join "\n"
+    in
+    case selection of
+        NoSelection ->
+            ""
+
+        SelectingFrom startHover ->
+            hoversToPositions lines startHover currentHover
+                |> Maybe.map (\( from, to ) -> positionsToString from to)
+                |> Maybe.withDefault ""
+
+        SelectedChar { line, column } ->
+            lineContent lines line
+                |> String.dropLeft column
+                |> String.left 1
+
+        Selection from to ->
+            positionsToString from to
 
 
 viewEditor : Model -> Html Msg
@@ -616,23 +780,25 @@ viewContent model =
             , ( "background-color", "#f0f0f0" )
             , ( "user-select", "none" )
             ]
+        , HE.onMouseDown StartSelecting
+        , HE.onMouseUp StopSelecting
         , HE.onClick GoToHoveredPosition
         , HE.onMouseOut (Hover NoHover)
         ]
-        [ viewLines model.position model.hover model.lines ]
+        [ viewLines model.cursor model.hover model.selection model.lines ]
 
 
-viewLines : Position -> Hover -> Array String -> Html Msg
-viewLines position hover lines =
+viewLines : Position -> Hover -> Selection -> Array String -> Html Msg
+viewLines position hover selection lines =
     H.div []
         (lines
-            |> Array.indexedMap (viewLine position hover lines)
+            |> Array.indexedMap (viewLine position hover selection lines)
             |> Array.toList
         )
 
 
-viewLine : Position -> Hover -> Array String -> Int -> String -> Html Msg
-viewLine position hover lines line content =
+viewLine : Position -> Hover -> Selection -> Array String -> Int -> String -> Html Msg
+viewLine position hover selection lines line content =
     H.div
         [ HA.style
             [ ( "position", "absolute" )
@@ -644,35 +810,68 @@ viewLine position hover lines line content =
         , HE.onMouseOver (Hover (HoverLine line))
         ]
         (if position.line == line && isLastColumn lines line position.column then
-            viewChars position hover lines line content
-                ++ [ viewCursor position positionColor nbsp ]
+            viewChars position hover selection lines line content
+                ++ [ viewCursor position nbsp ]
          else
-            viewChars position hover lines line content
+            viewChars position hover selection lines line content
         )
 
 
-viewChars : Position -> Hover -> Array String -> Int -> String -> List (Html Msg)
-viewChars position hover lines line content =
+viewChars : Position -> Hover -> Selection -> Array String -> Int -> String -> List (Html Msg)
+viewChars position hover selection lines line content =
     content
         |> String.toList
-        |> List.indexedMap (viewChar position hover lines line)
+        |> List.indexedMap (viewChar position hover selection lines line)
 
 
-viewChar : Position -> Hover -> Array String -> Int -> Int -> Char -> Html Msg
-viewChar position hover lines line column char =
+viewChar : Position -> Hover -> Selection -> Array String -> Int -> Int -> Char -> Html Msg
+viewChar position hover selection lines line column char =
     if position.line == line && position.column == column then
-        viewCursor position positionColor (String.fromChar char)
+        viewCursor
+            position
+            (String.fromChar char)
+    else if selection /= NoSelection && isSelected lines selection hover line column then
+        viewSelectedChar
+            { line = line, column = column }
+            (String.fromChar char)
     else
-        let
-            charPosition =
-                { line = line, column = column }
-        in
-        if hover == HoverChar charPosition then
-            viewCursor charPosition hoverColor (String.fromChar char)
-        else
-            H.span
-                [ onHover { line = line, column = column } ]
-                [ H.text (String.fromChar char) ]
+        H.span
+            [ onHover { line = line, column = column } ]
+            [ H.text (String.fromChar char) ]
+
+
+isSelected : Array String -> Selection -> Hover -> Int -> Int -> Bool
+isSelected lines selection currentHover line column =
+    let
+        isSelectedPositions : Position -> Position -> Bool
+        isSelectedPositions from to =
+            (from.line <= line)
+                && (to.line >= line)
+                && (if from.line == line then
+                        from.column <= column
+                    else
+                        True
+                   )
+                && (if to.line == line then
+                        to.column >= column
+                    else
+                        True
+                   )
+    in
+    case selection of
+        NoSelection ->
+            False
+
+        SelectingFrom startHover ->
+            hoversToPositions lines startHover currentHover
+                |> Maybe.map (\( from, to ) -> isSelectedPositions from to)
+                |> Maybe.withDefault False
+
+        SelectedChar position ->
+            position == { line = line, column = column }
+
+        Selection from to ->
+            isSelectedPositions from to
 
 
 nbsp : String
@@ -680,20 +879,19 @@ nbsp =
     " "
 
 
-positionColor : String
-positionColor =
-    "orange"
-
-
-hoverColor : String
-hoverColor =
-    "lightgrey"
-
-
-viewCursor : Position -> String -> String -> Html Msg
-viewCursor position color char =
+viewCursor : Position -> String -> Html Msg
+viewCursor position char =
     H.span
-        [ HA.style [ ( "background-color", color ) ]
+        [ HA.style [ ( "background-color", "orange" ) ]
+        , onHover position
+        ]
+        [ H.text char ]
+
+
+viewSelectedChar : Position -> String -> Html Msg
+viewSelectedChar position char =
+    H.span
+        [ HA.style [ ( "background-color", "#ccc" ) ]
         , onHover position
         ]
         [ H.text char ]
