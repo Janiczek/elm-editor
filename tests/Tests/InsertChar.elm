@@ -3,7 +3,7 @@ module Tests.InsertChar exposing (..)
 import ArchitectureTest exposing (..)
 import Array.Hamt as Array
 import Expect exposing (Expectation)
-import Main exposing (Msg(InsertChar), lineContent, lineLength)
+import Main exposing (Msg(..), lineContent, lineLength)
 import Test exposing (..)
 import Tests.Common exposing (..)
 

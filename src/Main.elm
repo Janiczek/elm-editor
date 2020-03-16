@@ -1,7 +1,8 @@
 module Main exposing (..)
 
-import Array.Hamt as Array exposing (Array)
-import Dom
+import Array exposing (Array)
+import Browser
+import Browser.Dom
 import Html as H exposing (Attribute, Html)
 import Html.Attributes as HA
 import Html.Events as HE
@@ -9,9 +10,9 @@ import Json.Decode as JD exposing (Decoder)
 import Task
 
 
-main : Program Never Model Msg
+main : Program () Model Msg
 main =
-    H.program
+    Browser.document
         { init = init
         , update = update
         , view = view
@@ -71,10 +72,10 @@ initModel =
     }
 
 
-init : ( Model, Cmd Msg )
-init =
+init : () -> ( Model, Cmd Msg )
+init () =
     ( initModel
-    , Dom.focus "editor"
+    , Browser.Dom.focus "editor"
         |> Task.attempt (always NoOp)
     )
 
@@ -223,6 +224,7 @@ update msg model =
 
                                     HoverChar position ->
                                         SelectedChar position
+
                             else
                                 hoversToPositions model.lines startHover endHover
                                     |> Maybe.map (\( from, to ) -> Selection from to)
@@ -248,6 +250,7 @@ hoversToPositions lines from to =
                 ( position
                 , { line = line, column = lastColumn lines line }
                 )
+
             else
                 ( { line = line + 1, column = 0 }
                 , position
@@ -284,6 +287,7 @@ hoversToPositions lines from to =
                 ( smaller, bigger ) =
                     if comparePositions position1 position2 == LT then
                         ( position1, position2 )
+
                     else
                         ( position2, position1 )
             in
@@ -294,8 +298,10 @@ comparePositions : Position -> Position -> Order
 comparePositions from to =
     if from.line < to.line || (from.line == to.line && from.column < to.column) then
         LT
+
     else if from == to then
         EQ
+
     else
         GT
 
@@ -348,6 +354,7 @@ newLine ({ cursor, lines } as model) =
                     (\i content ->
                         if i == line then
                             String.left column content
+
                         else
                             content
                     )
@@ -399,6 +406,7 @@ insertChar char ({ cursor, lines } as model) =
                     (\i content ->
                         if i == line then
                             lineWithCharAdded content
+
                         else
                             content
                     )
@@ -419,6 +427,7 @@ removeCharBefore : Model -> Model
 removeCharBefore ({ cursor, lines } as model) =
     if isStartOfDocument cursor then
         model
+
     else
         let
             { line, column } =
@@ -434,15 +443,19 @@ removeCharBefore ({ cursor, lines } as model) =
                 if lineNum == line - 1 then
                     if isFirstColumn column then
                         [ content ++ lineContent lines line ]
+
                     else
                         [ content ]
+
                 else if lineNum == line then
                     if isFirstColumn column then
                         []
+
                     else
                         [ String.left (column - 1) content
                             ++ String.dropLeft column content
                         ]
+
                 else
                     [ content ]
 
@@ -463,6 +476,7 @@ removeCharAfter : Model -> Model
 removeCharAfter ({ cursor, lines } as model) =
     if isEndOfDocument lines cursor then
         model
+
     else
         let
             { line, column } =
@@ -477,15 +491,19 @@ removeCharAfter ({ cursor, lines } as model) =
                 if lineNum == line then
                     if isOnLastColumn then
                         [ content ++ lineContent lines (line + 1) ]
+
                     else
                         [ String.left column content
                             ++ String.dropLeft (column + 1) content
                         ]
+
                 else if lineNum == line + 1 then
                     if isOnLastColumn then
                         []
+
                     else
                         [ content ]
+
                 else
                     [ content ]
 
@@ -506,6 +524,7 @@ moveUp : Position -> Array String -> Position
 moveUp { line, column } lines =
     if isFirstLine line then
         startOfDocument
+
     else
         let
             line_ : Int
@@ -521,6 +540,7 @@ moveDown : Position -> Array String -> Position
 moveDown { line, column } lines =
     if isLastLine lines line then
         endOfDocument lines
+
     else
         let
             line_ : Int
@@ -536,6 +556,7 @@ moveLeft : Position -> Array String -> Position
 moveLeft ({ line, column } as position) lines =
     if isStartOfDocument position then
         position
+
     else if isFirstColumn column then
         let
             line_ : Int
@@ -545,6 +566,7 @@ moveLeft ({ line, column } as position) lines =
         { line = line_
         , column = lastColumn lines line_
         }
+
     else
         { line = line
         , column = column - 1
@@ -555,10 +577,12 @@ moveRight : Position -> Array String -> Position
 moveRight ({ line, column } as position) lines =
     if isEndOfDocument lines position then
         position
+
     else if isLastColumn lines line column then
         { line = nextLine lines line
         , column = 0
         }
+
     else
         { line = line
         , column = column + 1
@@ -657,28 +681,30 @@ lineLength lines lineNum =
         |> String.length
 
 
-view : Model -> Html Msg
+view : Model -> Browser.Document Msg
 view model =
-    H.div []
+    { title = "elm-editor"
+    , body =
         [ viewEditor model
         , viewDebug model
         ]
+    }
 
 
 viewDebug : Model -> Html Msg
 viewDebug { lines, cursor, hover, selection } =
     H.div
-        [ HA.style [ ( "max-width", "100%" ) ] ]
+        [ HA.style "max-width" "100%" ]
         [ H.text "lines:"
         , H.pre
-            [ HA.style [ ( "white-space", "pre-wrap" ) ] ]
-            [ H.text (toString lines) ]
+            [ HA.style "white-space" "pre-wrap" ]
+            [ H.text (Debug.toString lines) ]
         , H.text "cursor:"
-        , H.pre [] [ H.text (toString cursor) ]
+        , H.pre [] [ H.text (Debug.toString cursor) ]
         , H.text "hover:"
-        , H.pre [] [ H.text (toString hover) ]
+        , H.pre [] [ H.text (Debug.toString hover) ]
         , H.text "selection:"
-        , H.pre [] [ H.text (toString selection) ]
+        , H.pre [] [ H.text (Debug.toString selection) ]
         , H.text "selected text:"
         , H.pre [] [ H.text (selectedText selection hover lines) ]
         ]
@@ -703,10 +729,13 @@ selectedText selection currentHover lines =
                             line
                                 |> String.dropLeft from.column
                                 |> String.left (to.column - from.column + 1)
+
                         else if i == 0 then
                             String.dropLeft from.column line
+
                         else if i == numberOfLines - 1 then
                             String.left (to.column + 1) line
+
                         else
                             line
                     )
@@ -733,14 +762,12 @@ selectedText selection currentHover lines =
 viewEditor : Model -> Html Msg
 viewEditor model =
     H.div
-        [ HA.style
-            [ ( "display", "flex" )
-            , ( "flex-direction", "row" )
-            , ( "font-family", "monospace" )
-            , ( "font-size", toString fontSize ++ "px" )
-            , ( "line-height", toString lineHeight ++ "px" )
-            , ( "white-space", "pre" )
-            ]
+        [ HA.style "display" "flex"
+        , HA.style "flex-direction" "row"
+        , HA.style "font-family" "monospace"
+        , HA.style "font-size" (String.fromFloat fontSize ++ "px")
+        , HA.style "line-height" (String.fromFloat lineHeight ++ "px")
+        , HA.style "white-space" "pre"
         , HE.on "keydown" keyDecoder
         , HA.tabindex 0
         , HA.id "editor"
@@ -753,13 +780,11 @@ viewEditor model =
 viewLineNumbers : Model -> Html Msg
 viewLineNumbers model =
     H.div
-        [ HA.style
-            [ ( "width", "2em" )
-            , ( "text-align", "center" )
-            , ( "color", "#888" )
-            , ( "display", "flex" )
-            , ( "flex-direction", "column" )
-            ]
+        [ HA.style "width" "2em"
+        , HA.style "text-align" "center"
+        , HA.style "color" "#888"
+        , HA.style "display" "flex"
+        , HA.style "flex-direction" "column"
         ]
         (List.range 1 (Array.length model.lines)
             |> List.map viewLineNumber
@@ -768,18 +793,16 @@ viewLineNumbers model =
 
 viewLineNumber : Int -> Html Msg
 viewLineNumber n =
-    H.span [] [ H.text (toString n) ]
+    H.span [] [ H.text (String.fromInt n) ]
 
 
 viewContent : Model -> Html Msg
 viewContent model =
     H.div
-        [ HA.style
-            [ ( "position", "relative" )
-            , ( "flex", "1" )
-            , ( "background-color", "#f0f0f0" )
-            , ( "user-select", "none" )
-            ]
+        [ HA.style "position" "relative"
+        , HA.style "flex" "1"
+        , HA.style "background-color" "#f0f0f0"
+        , HA.style "user-select" "none"
         , HE.onMouseDown StartSelecting
         , HE.onMouseUp StopSelecting
         , HE.onClick GoToHoveredPosition
@@ -800,18 +823,17 @@ viewLines position hover selection lines =
 viewLine : Position -> Hover -> Selection -> Array String -> Int -> String -> Html Msg
 viewLine position hover selection lines line content =
     H.div
-        [ HA.style
-            [ ( "position", "absolute" )
-            , ( "left", "0" )
-            , ( "right", "0" )
-            , ( "height", toString lineHeight ++ "px" )
-            , ( "top", toString (toFloat line * lineHeight) ++ "px" )
-            ]
+        [ HA.style "position" "absolute"
+        , HA.style "left" "0"
+        , HA.style "right" "0"
+        , HA.style "height" (String.fromFloat lineHeight ++ "px")
+        , HA.style "top" (String.fromFloat (toFloat line * lineHeight) ++ "px")
         , HE.onMouseOver (Hover (HoverLine line))
         ]
         (if position.line == line && isLastColumn lines line position.column then
             viewChars position hover selection lines line content
                 ++ [ viewCursor position nbsp ]
+
          else
             viewChars position hover selection lines line content
         )
@@ -830,10 +852,12 @@ viewChar position hover selection lines line column char =
         viewCursor
             position
             (String.fromChar char)
+
     else if selection /= NoSelection && isSelected lines selection hover line column then
         viewSelectedChar
             { line = line, column = column }
             (String.fromChar char)
+
     else
         H.span
             [ onHover { line = line, column = column } ]
@@ -849,11 +873,13 @@ isSelected lines selection currentHover line column =
                 && (to.line >= line)
                 && (if from.line == line then
                         from.column <= column
+
                     else
                         True
                    )
                 && (if to.line == line then
                         to.column >= column
+
                     else
                         True
                    )
@@ -876,13 +902,13 @@ isSelected lines selection currentHover line column =
 
 nbsp : String
 nbsp =
-    " "
+    "\u{00A0}"
 
 
 viewCursor : Position -> String -> Html Msg
 viewCursor position char =
     H.span
-        [ HA.style [ ( "background-color", "orange" ) ]
+        [ HA.style "background-color" "orange"
         , onHover position
         ]
         [ H.text char ]
@@ -891,7 +917,7 @@ viewCursor position char =
 viewSelectedChar : Position -> String -> Html Msg
 viewSelectedChar position char =
     H.span
-        [ HA.style [ ( "background-color", "#ccc" ) ]
+        [ HA.style "background-color" "#ccc"
         , onHover position
         ]
         [ H.text char ]
@@ -899,9 +925,13 @@ viewSelectedChar position char =
 
 onHover : Position -> Attribute Msg
 onHover position =
-    HE.onWithOptions "mouseover"
-        { stopPropagation = True, preventDefault = True }
-        (JD.succeed (Hover (HoverChar position)))
+    HE.custom "mouseover"
+        (JD.succeed
+            { message = Hover (HoverChar position)
+            , stopPropagation = True
+            , preventDefault = True
+            }
+        )
 
 
 fontSize : Float

@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
 
-elm make --yes --warn src/Main.elm
+elm make src/Main.elm
